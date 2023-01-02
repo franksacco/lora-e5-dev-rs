@@ -1,0 +1,34 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/rust
+{
+    "build" : {
+        "context": ".",
+        "dockerfile": "./Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "marus25.cortex-debug"
+            ]
+        }
+    },
+    "name": "lora-e5-dev-rs",
+
+    "mounts": [
+        "source=/opt/st/stm32cubeide_1.10.1/plugins/com.st.stm32cube.ide.mcu.externaltools.openocd.linux64_2.2.100.202206011703/tools/bin,target=/opt/openocd,type=bind,consistency=cached"
+    ],
+    "remoteEnv": {
+        "PATH": "${containerEnv:PATH}:/opt/openocd"
+    },
+
+    "capAdd": ["SYS_PTRACE"],
+    "securityOpt": ["seccomp=unconfined"],
+    "remoteUser": "root",
+
+    "runArgs": [
+        "--volume=/dev/bus/usb:/dev/bus/usb",
+        "--device=/dev/ttyACM0",
+        "--device=/dev/ttyUSB0",
+        "--device-cgroup-rule=c 189:* rmw"
+    ]
+}
