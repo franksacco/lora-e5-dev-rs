@@ -1,0 +1,25 @@
+{
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    // Hover to view descriptions of existing attributes.
+    // Use IntelliSense to learn about possible attributes.
+    "configurations": [
+        {
+            "configFiles": ["./openocd.cfg"],
+            "cwd": "${workspaceFolder}",
+            "device": "STM32WLE5_CM4",
+            "executable": "./target/thumbv7em-none-eabi/debug/lora-e5-dev",
+            "gdbPath": "gdb-multiarch",
+            "name": "OpenOCD",
+            "postLaunchCommands": [
+                "monitor arm semihosting enable"
+            ],
+            "request": "launch",
+            "runToEntryPoint": "main",
+            "searchDir": ["./openocd"],
+            "servertype": "openocd",
+            "svdFile": "./STM32WLE5_CM4.svd",
+            "type": "cortex-debug",
+        }
+    ],
+    "version": "0.2.0"
+}
