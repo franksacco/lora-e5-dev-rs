@@ -31,6 +31,6 @@ RUN rustup default stable \
     # Install cargo-flash.
     && cargo install cargo-flash \
     # Install clippy for rust-analyzer and rustfmt.
-    && rustup component add clippy rustufmt \
+    && rustup component add clippy rustfmt \
     # Install Rust Toolchain for Cortex-M4 without hardware floating point.
     && rustup target add thumbv7em-none-eabi
