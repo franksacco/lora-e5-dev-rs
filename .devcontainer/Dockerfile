@@ -1,18 +1,18 @@
-FROM mcr.microsoft.com/devcontainers/rust:1-bullseye
+FROM mcr.microsoft.com/devcontainers/rust:0-1-bullseye
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     # Install various dependencies.
     && apt-get -y install --no-install-recommends \
-        pkg-config \
-        libusb-1.0-0-dev \
-        libftdi1-dev \
         libudev-dev \
         libcapstone4 \
+        libftdi1-dev \
         libgpiod2 \
         libhidapi-hidraw0 \
         libjaylink0 \
         libjim0.79 \
         libusb-0.1-4 \
+        libusb-1.0-0-dev \
+        pkg-config \
     # Install multi-arch version of objdump and nm, and create symbolic links.
     && apt-get -y install --no-install-recommends binutils-multiarch \
     && ln -s /usr/bin/objdump /usr/bin/objdump-multiarch \

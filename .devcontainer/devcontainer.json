@@ -1,5 +1,3 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/rust
 {
     "build" : {
         "context": ".",
@@ -14,6 +12,7 @@
     },
     "name": "lora-e5-dev-rs",
 
+    // Use the OpenOCD fork shipped with STM32Cube by STMicroelectronics.
     "mounts": [
         "source=/opt/st/stm32cubeide_1.10.1/plugins/com.st.stm32cube.ide.mcu.externaltools.openocd.linux64_2.2.100.202206011703/tools/bin,target=/opt/openocd,type=bind,consistency=cached"
     ],
@@ -26,9 +25,11 @@
     "remoteUser": "root",
 
     "runArgs": [
-        "--volume=/dev/bus/usb:/dev/bus/usb",
-        "--device=/dev/ttyACM0",
-        "--device=/dev/ttyUSB0",
+        // Mounting the entire `/dev` folder is not a good practice.
+        // A better approach might be to expose a specific host device to the
+        // container, for example using "--device=/dev/ttyACM0".
+        "--volume=/dev:/dev",
+        // Required to access usb devices.
         "--device-cgroup-rule=c 189:* rmw"
     ]
 }
