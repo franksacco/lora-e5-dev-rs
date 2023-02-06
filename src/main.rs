@@ -1,47 +1,84 @@
-#![no_std]
 #![no_main]
+#![no_std]
 
-mod log;
+use defmt_rtt as _; // global logger
 
-use cortex_m::{delay::Delay, interrupt};
-use cortex_m_rt::entry;
+use core::cell::RefCell;
 
+use cortex_m::{
+    delay::Delay,
+    interrupt::{self, Mutex},
+};
 use lora_e5_bsp::{
-    hal::{gpio::PortB, pac, util::new_delay},
+    hal::{
+        gpio::PortB,
+        info::{self, Core, Package, Uid, Uid64},
+        pac,
+        util::new_delay,
+    },
     led,
 };
 
-// Dev profile: easier to debug panics when in debug
 #[cfg(debug_assertions)]
-use panic_semihosting as _;
+use panic_probe as _; // panic handler
 
-// Release profile: minimize the binary size of the application
 #[cfg(not(debug_assertions))]
 #[panic_handler]
-fn panic_handler(_: &core::panic::PanicInfo) -> ! {
+fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
+    interrupt::free(|cs| {
+        let mut led = LED.borrow(cs).borrow_mut();
+        if let Some(ref mut led) = led.as_mut() {
+            loop {
+                for _ in 0..100_000 {
+                    cortex_m::asm::nop();
+                }
+                led.set_on();
+                for _ in 0..100_000 {
+                    cortex_m::asm::nop();
+                }
+                led.set_off();
+            }
+        }
+    });
+
     loop {
         cortex_m::asm::nop();
     }
 }
 
-#[entry]
+// Global static access to the board led, used to report errors.
+static LED: Mutex<RefCell<Option<led::D5>>> = Mutex::new(RefCell::new(None));
+
+#[cortex_m_rt::entry]
 fn main() -> ! {
     let mut dp: pac::Peripherals = pac::Peripherals::take().unwrap();
     let cp: pac::CorePeripherals = pac::CorePeripherals::take().unwrap();
 
+    // Print some infos from the board.
+    defmt::println!("CPU: {}", Core::from_cpuid());
+    defmt::println!("Flash size: {} KiB", info::flash_size_kibibyte());
+    defmt::println!("Package: {:?}", Package::from_device());
+    defmt::println!("UID64: {}", Uid64::from_device());
+    defmt::println!("UID: {}", Uid::from_device());
+
     let gpiob: PortB = PortB::split(dp.GPIOB, &mut dp.RCC);
-    let mut led = interrupt::free(|cs| led::D5::new(gpiob.b5, cs));
-    led.set_off();
+    interrupt::free(|cs| LED.borrow(cs).replace(Some(led::D5::new(gpiob.b5, cs))));
 
     let mut delay: Delay = new_delay(cp.SYST, &dp.RCC);
 
-    log::log!("Starting blinky");
+    defmt::info!("Starting blinky");
     loop {
-        delay.delay_ms(1000);
-        led.set_on();
-        log::log!("LED is on");
-
+        interrupt::free(|cs| {
+            let mut led = LED.borrow(cs).borrow_mut();
+            led.as_mut().unwrap().set_on();
+        });
+        defmt::debug!("LED is on");
         delay.delay_ms(100);
-        led.set_off();
+
+        interrupt::free(|cs| {
+            let mut led = LED.borrow(cs).borrow_mut();
+            led.as_mut().unwrap().set_off();
+        });
+        delay.delay_ms(2000);
     }
 }

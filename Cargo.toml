@@ -2,7 +2,7 @@
 name = "lora-e5-dev"
 version = "0.1.0"
 authors = ["Francesco Saccani <francesco.saccani@unipr.it>"]
-edition = "2018"
+edition = "2021"
 description = "Ready to use template for flashing and debugging LoRa-E5-Dev Board"
 readme = "README.md"
 
@@ -12,11 +12,12 @@ test = false
 bench = false
 
 [dependencies]
-cortex-m = "0.7.6"
+cortex-m = { version = "0.7.6", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.2"
-cortex-m-semihosting = "0.5.0"
-panic-semihosting = "0.6.0"
-lora-e5-bsp = "0.6.1"
+defmt = "0.3.2"
+defmt-rtt = "0.4.0"
+lora-e5-bsp = { version = "0.6.1", features = ["defmt"] }
+panic-probe ={ version = "0.3", features = ["print-defmt"] }
 
 # cargo build/run
 [profile.dev]
