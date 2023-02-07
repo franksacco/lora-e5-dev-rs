@@ -3,20 +3,18 @@
 
 use defmt_rtt as _; // global logger
 
-use core::cell::RefCell;
+use core::cell::{Cell, RefCell};
 
-use cortex_m::{
-    delay::Delay,
-    interrupt::{self, Mutex},
-};
 use lora_e5_bsp::{
     hal::{
-        gpio::PortB,
+        cortex_m::{self, delay::Delay, interrupt::Mutex},
+        gpio::{pins, Exti, ExtiTrg, PortA, PortB},
         info::{self, Core, Package, Uid, Uid64},
-        pac,
+        pac::{self, interrupt},
         util::new_delay,
     },
     led,
+    pb::{self, PushButton, D0},
 };
 
 #[cfg(debug_assertions)]
@@ -25,7 +23,7 @@ use panic_probe as _; // panic handler
 #[cfg(not(debug_assertions))]
 #[panic_handler]
 fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
-    interrupt::free(|cs| {
+    cortex_m::interrupt::free(|cs| {
         let mut led = LED.borrow(cs).borrow_mut();
         if let Some(ref mut led) = led.as_mut() {
             loop {
@@ -49,36 +47,67 @@ fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
 // Global static access to the board led, used to report errors.
 static LED: Mutex<RefCell<Option<led::D5>>> = Mutex::new(RefCell::new(None));
 
+static BLINK: Mutex<Cell<bool>> = Mutex::new(Cell::new(true));
+
 #[cortex_m_rt::entry]
 fn main() -> ! {
+    // Retrieve device and core peripherals.
     let mut dp: pac::Peripherals = pac::Peripherals::take().unwrap();
     let cp: pac::CorePeripherals = pac::CorePeripherals::take().unwrap();
 
     // Print some infos from the board.
-    defmt::println!("CPU: {}", Core::from_cpuid());
-    defmt::println!("Flash size: {} KiB", info::flash_size_kibibyte());
-    defmt::println!("Package: {:?}", Package::from_device());
-    defmt::println!("UID64: {}", Uid64::from_device());
-    defmt::println!("UID: {}", Uid::from_device());
+    defmt::debug!("CPU: {}", Core::from_cpuid());
+    defmt::debug!("Flash size: {} KiB", info::flash_size_kibibyte());
+    defmt::debug!("Package: {:?}", Package::from_device());
+    defmt::debug!("UID64: {}", Uid64::from_device());
+    defmt::debug!("UID: {}", Uid::from_device());
 
+    // Setup the D0 button connected to pin A0.
+    let gpioa: PortA = PortA::split(dp.GPIOA, &mut dp.RCC);
+    let _ = cortex_m::interrupt::free(|cs| pb::D0::new(gpioa.a0, cs));
+
+    // Setup an input pin as an EXTI interrupt source.
+    <D0 as PushButton>::Pin::setup_exti_c1(&mut dp.EXTI, &mut dp.SYSCFG, ExtiTrg::Falling);
+    // Unmask the interrupt in the NVIC.
+    unsafe { pins::A0::unmask() };
+
+    // Setup the D5 led connected to pin B5.
     let gpiob: PortB = PortB::split(dp.GPIOB, &mut dp.RCC);
-    interrupt::free(|cs| LED.borrow(cs).replace(Some(led::D5::new(gpiob.b5, cs))));
+    cortex_m::interrupt::free(|cs| LED.borrow(cs).replace(Some(led::D5::new(gpiob.b5, cs))));
 
+    // Setup the system timer.
     let mut delay: Delay = new_delay(cp.SYST, &dp.RCC);
 
     defmt::info!("Starting blinky");
     loop {
-        interrupt::free(|cs| {
-            let mut led = LED.borrow(cs).borrow_mut();
-            led.as_mut().unwrap().set_on();
-        });
-        defmt::debug!("LED is on");
-        delay.delay_ms(100);
+        let blink = cortex_m::interrupt::free(|cs| BLINK.borrow(cs).get());
+        if blink {
+            cortex_m::interrupt::free(|cs| {
+                let mut led = LED.borrow(cs).borrow_mut();
+                led.as_mut().unwrap().set_on();
+            });
+            defmt::debug!("LED is on");
+            delay.delay_ms(100);
 
-        interrupt::free(|cs| {
-            let mut led = LED.borrow(cs).borrow_mut();
-            led.as_mut().unwrap().set_off();
-        });
-        delay.delay_ms(2000);
+            cortex_m::interrupt::free(|cs| {
+                let mut led = LED.borrow(cs).borrow_mut();
+                led.as_mut().unwrap().set_off();
+            });
+            delay.delay_ms(1000);
+        } else {
+            cortex_m::asm::wfi();
+        }
     }
+}
+
+#[interrupt]
+#[allow(non_snake_case)]
+fn EXTI0() {
+    defmt::info!("Button D0 pushed");
+    cortex_m::interrupt::free(|cs| {
+        let val = BLINK.borrow(cs).get();
+        BLINK.borrow(cs).set(!val);
+    });
+
+    pins::A0::clear_exti();
 }
